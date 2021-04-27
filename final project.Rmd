@@ -1,0 +1,49 @@
+---
+title: "Final Project"
+author: Madeleine Bannon
+author: 
+author: 
+output: html_document
+---
+@chris @charles - this is the outline for our writeup. feel free to add and/or edit it. 
+#Executive summary
+##Goal of the study
+##Data
+###Data cleanup and extraction
+###Predictor variables
+##Findings
+
+#Detailed analysis
+##Model 1 [to be filled in further]
+##Model 2 [to be filled in further]
+#Appendix
+##Exhibit 1
+##Exhibit [##]
+
+@chris @charles - proposed managerial  questions [and analyses]
++ What factors impact airline reliability the most? [logistic regression (lasso?) & random forest]
+  + What causes a delay vs. what causes a cancellation?
+  + Is there a difference between departure delays and arrival delays?
+
++ What factors impact the length of a cancellation? [multivariate regression (lasso?) & random forest]
+
+[EDA for below?]
++ Which airlines are the most reliable?
++ Which locations experience the least amount of delays?
++ How does time of year impact flight reliability?
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
+if(!require("pacman")) install.packages("pacman")
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table)   #add your packages here
+```
+
+```{r data upload, include=FALSE}
+
+
+```
+
+```{r}
+
+```
+
