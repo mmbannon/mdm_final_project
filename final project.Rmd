@@ -74,26 +74,60 @@ airline_data <- read.csv("data/flights.csv")
 
 diagnose(airline_data)
 
+tail(airline_data, 50)
+
+skim(airline_data)
+
 ```
 
 ```{r create dataset we want, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
 #create new variables
-hz_data_new<- hz_data %>% mutate(Time=
-#refactor variables                 
-#hz_data_new<- hz_data_new %>% mutate(Survey_Type=as.factor(Survey_Type),)
-#Remove unnecessary variables
-#hz_data_sub <- hz_data_new %>% select(-...) %>%  
-                                      #drop_na() 
+airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
+                                            FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)))
+
+table(airline_data_new$FLIGHT_DELAY_5)
+
+airline_pct_delay_15 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_15)  %>% group_by(AIRLINE, FLIGHT_DELAY_15) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_15==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_delay_15, 20)
+
+airline_pct_delay_5 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_5) %>% group_by(AIRLINE, FLIGHT_DELAY_5) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_5==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_delay_5, 20)
+
 
 ```
 
+```{r absolute number of flights}
 
-```{r}
-dept_delay_bar <- ggplot(airline_data, aes(x=AIRLINE, y=DEPARTURE_DELAY)) + 
+total_flights <- ggplot(airline_data_new, aes(x=AIRLINE)) + 
+  geom_bar()
+
+print(total_flights)
+```
+
+```{r flight delay percentage using standard delay definition}
+
+total_flights_delayed_pct <- ggplot(airline_pct_delay_15, aes(x=reorder(AIRLINE, -percent), y=percent)) + 
   geom_bar(stat = "identity")
 
-print(dept_delay_bar)
+print(total_flights_delayed_pct)
 
 ```
 
+
+```{r absolute number of flights cancelled by airline}
+airline_delay  <- ggplot(airline_data_new, aes(x=AIRLINE, y=FLIGHT_DELAY_15)) + 
+  geom_bar(stat = "identity")
+
+airline_diverted <- ggplot(airline_data_new, aes(x=AIRLINE, y=DIVERTED)) + 
+  geom_bar(stat = "identity")
+
+airline_cancelled <- ggplot(airline_data_new, aes(x=AIRLINE, y=CANCELLED)) + 
+  geom_bar(stat = "identity")
+
+print(airline_delay)
+print(airline_diverted)
+print(airline_cancelled )
+```
 
