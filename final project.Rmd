@@ -68,19 +68,20 @@ pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr
 airline_data <- read.csv("data/flights.csv", stringsAsFactors = FALSE)
 ```
 
-```{r}
-
+```{r general EDA}
 diagnose(airline_data)
 
 tail(airline_data, 50)
 
 skim(airline_data)
-
 ```
 
 ```{r create flight_delay binary variable, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
 airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
                                             FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)))
+
+#our dataset is way too big to run a regression on.. LOL
+airline_data_new <- sample_frac(airline_data_new, .005)
 
 ````
 
@@ -147,13 +148,12 @@ print(total_flights_delayed_pct)
 
 ```{r flight departure delay percentage using standard delay definition by airport}
 
-origin_delayed_pct <- ggplot(origin_pct_delay_15, aes(x=reorder(ORIGIN_AIRPORT, -percent), y=percent)) + 
-  geom_bar(stat = "identity")
+#origin_delayed_pct <- ggplot(origin_pct_delay_15, aes(x=reorder(ORIGIN_AIRPORT, -percent), y=percent)) + 
+  #geom_bar(stat = "identity")
 
-print(origin_delayed_pct)
+#print(origin_delayed_pct)
 
 ```
-
 
 ```{r pct of flights cancelled bar chart}
 
@@ -161,6 +161,15 @@ total_flights_cancelled_pct <- ggplot(airline_pct_cancelled, aes(x=reorder(AIRLI
   geom_bar(stat = "identity")
 
 print(total_flights_cancelled_pct)
+
+```
+
+```{r create dataset with select variables for running regression}
+
+airline_subset_regression <- airline_data_new %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, ARRIVAL_DELAY)
+
+departure_delay_model <- lm(DEPARTURE_DELAY ~ ., airline_subset_regression)
+summary(departure_delay_model)
 
 ```
 
