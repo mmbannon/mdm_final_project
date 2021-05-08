@@ -8,9 +8,37 @@ output: html_document
 @chris @charles - this is the outline for our writeup. feel free to add and/or edit it. 
 #Executive summary
 ##Goal of the study
+In the last year, the airline industry has experienced an industry upheaval amid the COVID-19 pandemic. However, with contrainment progress from the rollout of the COVID-19 pandemic, traveler confidence has increasingly been restored. As such, as airlines and travelers return to pre-pandemic travel patterns, we thought it would be interesting to explore flight route patterns to better understand airline and airport reliaiblity.
+
+In this study, we aim to answer the following questions: 
++ What factors impact airline reliability the most? 
+  + What causes a delay vs. what causes a cancellation?
+  + Is there a difference between departure delays and arrival delays?
++ What factors impact the length of a cancellation? 
++ Which airlines are the most reliable?
++ Which locations experience the least amount of delays?
++ How does time of year impact flight reliability?
+
+##Background
+
+ Delays have plagued the air transportation industry since its inception, and remain a consistent pain point for most, if not all airlines today. In 2019, the United States Department of Transportation ("US DOT") reported that airline reliability performance worsened from the previous year, noting that 79% of all flights arrived on-time. However, "on-time" is defined as "one that arrives no more than 15 minutes after its scheduled arrival," a time frame that could easily result in a missed connection (NYT).
+
+
+
+source: https://www.nytimes.com/2020/02/19/business/air-travel-delays-airlines.html
+
+
 ##Data
+This dataset is from the United States Department of Travel Air Travel Consumer Report and includes records for 5M+ commercial airline flights in 2015. Each record represents a single flight (one-way) including information about the flight, such as the airline, origin/destination airport, schedule/actual flight times (departure and arrival).
+
 ###Data cleanup and extraction
+
+[INSERT ANY CHANGES TO DATA HERE]
+
 ###Predictor variables
+Our response variable is [INSERT] which represents [INSERT].
+
+[INSERT TABLE OF ALL VARIABLES]
 ##Findings
 
 #Detailed analysis
@@ -35,15 +63,37 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr)   #add your packages here
 ```
 
 ```{r data upload, include=FALSE}
-
-
+airline_data <- read.csv("data/flights.csv")
 ```
 
 ```{r}
 
+diagnose(airline_data)
+
 ```
+
+```{r create dataset we want, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
+#create new variables
+hz_data_new<- hz_data %>% mutate(Time=
+#refactor variables                 
+#hz_data_new<- hz_data_new %>% mutate(Survey_Type=as.factor(Survey_Type),)
+#Remove unnecessary variables
+#hz_data_sub <- hz_data_new %>% select(-...) %>%  
+                                      #drop_na() 
+
+```
+
+
+```{r}
+dept_delay_bar <- ggplot(airline_data, aes(x=AIRLINE, y=DEPARTURE_DELAY)) + 
+  geom_bar(stat = "identity")
+
+print(dept_delay_bar)
+
+```
+
 
