@@ -21,9 +21,7 @@ In this study, we aim to answer the following questions:
 
 ##Background
 
- Delays have plagued the air transportation industry since its inception, and remain a consistent pain point for most, if not all airlines today. In 2019, the United States Department of Transportation ("US DOT") reported that airline reliability performance worsened from the previous year, noting that 79% of all flights arrived on-time. However, "on-time" is defined as "one that arrives no more than 15 minutes after its scheduled arrival," a time frame that could easily result in a missed connection (NYT).
-
-
+Delays have plagued the air transportation industry since its inception, and remain a consistent pain point for most, if not all airlines today. In 2019, the United States Department of Transportation ("US DOT") reported that airline reliability performance worsened from the previous year, noting that 79% of all flights arrived on-time. However, "on-time" is defined as "one that arrives no more than 15 minutes after its scheduled arrival," a time frame that could easily result in a missed connection (NYT).
 
 source: https://www.nytimes.com/2020/02/19/business/air-travel-delays-airlines.html
 
@@ -36,7 +34,7 @@ This dataset is from the United States Department of Travel Air Travel Consumer 
 [INSERT ANY CHANGES TO DATA HERE]
 
 ###Predictor variables
-Our response variable is [INSERT] which represents [INSERT].
+Our response variable is [INSERT] which represents [INSERT].  [note: in process of creating binary for delayed or not delayed, maybe also include general issue variable for delay, cancelled, diverted]
 
 [INSERT TABLE OF ALL VARIABLES]
 ##Findings
@@ -67,7 +65,7 @@ pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr
 ```
 
 ```{r data upload, include=FALSE}
-airline_data <- read.csv("data/flights.csv")
+airline_data <- read.csv("data/flights.csv", stringsAsFactors = FALSE)
 ```
 
 ```{r}
@@ -80,25 +78,42 @@ skim(airline_data)
 
 ```
 
-```{r create dataset we want, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
-#create new variables
+```{r create flight_delay binary variable, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
 airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
                                             FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)))
 
-table(airline_data_new$FLIGHT_DELAY_15)
+````
 
-airline_pct_delay_15 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_15)  %>% group_by(AIRLINE, FLIGHT_DELAY_15) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) #%>% drop_na() %>% filter(FLIGHT_DELAY_15==1) %>% select(AIRLINE, percent)
+```{r create separate datasets for bar charts for fligth delays/diversions/cancellations by airline}
+#pct of flights delayed using standard definition 
+airline_pct_delay_15 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_15)  %>% group_by(AIRLINE, FLIGHT_DELAY_15) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_15==1) %>% select(AIRLINE, percent)
 
 head(airline_pct_delay_15, 20)
 
+#if definition of delay were 5 mins vs. 15
 airline_pct_delay_5 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_5) %>% group_by(AIRLINE, FLIGHT_DELAY_5) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_5==1) %>% select(AIRLINE, percent)
 
 head(airline_pct_delay_5, 20)
 
+#pct of flights diverted
+airline_pct_diverted <- airline_data_new %>% select(AIRLINE, DIVERTED) %>% group_by(AIRLINE, DIVERTED) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% filter(DIVERTED==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_diverted, 20)
+
+#pct of flights cancelled
+airline_pct_cancelled <- airline_data_new %>% select(AIRLINE, CANCELLED) %>% group_by(AIRLINE, CANCELLED) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(CANCELLED==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_cancelled, 20)
 
 ```
 
-```{r absolute number of flights}
+```{r create separate datasets for bar charts for fligth delays/diversions/cancellations by airport}
+#pct of flights delayed using standard definition ... for some reason airport codes showing up as numbers (factor levels?)??
+
+```
+
+
+```{r total flights flown by each airline}
 
 total_flights <- ggplot(airline_data_new, aes(x=AIRLINE)) + 
   geom_bar()
@@ -106,17 +121,7 @@ total_flights <- ggplot(airline_data_new, aes(x=AIRLINE)) +
 print(total_flights)
 ```
 
-```{r flight delay percentage using standard delay definition}
-
-total_flights_delayed_pct <- ggplot(airline_pct_delay_15, aes(x=reorder(AIRLINE, -percent), y=percent)) + 
-  geom_bar(stat = "identity")
-
-print(total_flights_delayed_pct)
-
-```
-
-
-```{r absolute number of flights cancelled by airline}
+```{r absolute number of flights delayed/diverted/ cancelled by airline}
 airline_delay  <- ggplot(airline_data_new, aes(x=AIRLINE, y=FLIGHT_DELAY_15)) + 
   geom_bar(stat = "identity")
 
@@ -130,4 +135,34 @@ print(airline_delay)
 print(airline_diverted)
 print(airline_cancelled )
 ```
+
+```{r flight delay percentage using standard delay definition}
+
+total_flights_delayed_pct <- ggplot(airline_pct_delay_15, aes(x=reorder(AIRLINE, -percent), y=percent)) + 
+  geom_bar(stat = "identity")
+
+print(total_flights_delayed_pct)
+
+```
+
+```{r flight departure delay percentage using standard delay definition by airport}
+
+origin_delayed_pct <- ggplot(origin_pct_delay_15, aes(x=reorder(ORIGIN_AIRPORT, -percent), y=percent)) + 
+  geom_bar(stat = "identity")
+
+print(origin_delayed_pct)
+
+```
+
+
+```{r pct of flights cancelled bar chart}
+
+total_flights_cancelled_pct <- ggplot(airline_pct_cancelled, aes(x=reorder(AIRLINE, -percent), y=percent)) + 
+  geom_bar(stat = "identity")
+
+print(total_flights_cancelled_pct)
+
+```
+
+
 
