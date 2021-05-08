@@ -66,6 +66,8 @@ pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr
 
 ```{r data upload, include=FALSE}
 airline_data <- read.csv("data/flights.csv", stringsAsFactors = FALSE)
+airport_data <- read.csv("data/airports.csv", stringsAsFactors = FALSE)
+census_data <- read.csv("data/census.csv", stringsAsFactors = FALSE)
 ```
 
 ```{r general EDA}
@@ -76,14 +78,46 @@ tail(airline_data, 50)
 skim(airline_data)
 ```
 
-```{r create flight_delay binary variable, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
+```{r create NEW variables, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
 airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
-                                            FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)))
+                                            FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)), 
+                                            DEPARTURE_TIME_OF_DAY = ifelse(SCHEDULED_DEPARTURE>1200, "PM", "AM"), 
+                                            ARRIVAL_TIME_OF_DAY = ifelse(ARRIVAL_TIME>1200, "PM", "AM")
+                                            DATE = )
+
+airport_data_new <- airport_data %>% 
+  select(IATA_CODE, STATE)
+
+census_data_new <- census_data %>%
+  select(State.Code, Region, Division)
+
+#merging our state data with flight data
+airline_data_new <- left_join(airline_data_new, airport_data_new, by = c("ORIGIN_AIRPORT"="IATA_CODE"))
+airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_STATE = STATE)
+airline_data_new <- left_join(airline_data_new, airport_data_new, by = c("DESTINATION_AIRPORT"="IATA_CODE"))
+airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_STATE = STATE)
+
+#merging census descriptive data with flight data 
+airline_data_new <- left_join(airline_data_new, census_data_new, by = c("ORIGIN_AIRPORT_STATE"="State.Code"))
+airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_REGION = Region)
+airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_DIVISION = Division)
+airline_data_new <- left_join(airline_data_new, census_data_new, by = c("DESTINATION_AIRPORT_STATE"="State.Code"))
+airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_REGION = Region)
+airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_DIVISION = Division)
+
+#merging holiday data 
+
+
+
+```
+
+```{r}
 
 #our dataset is way too big to run a regression on.. LOL
+set.seed(100)
 airline_data_new <- sample_frac(airline_data_new, .005)
 
-````
+```
 
 ```{r create separate datasets for bar charts for fligth delays/diversions/cancellations by airline}
 #pct of flights delayed using standard definition 
@@ -112,7 +146,6 @@ head(airline_pct_cancelled, 20)
 #pct of flights delayed using standard definition ... for some reason airport codes showing up as numbers (factor levels?)??
 
 ```
-
 
 ```{r total flights flown by each airline}
 
@@ -166,7 +199,7 @@ print(total_flights_cancelled_pct)
 
 ```{r create dataset with select variables for running regression}
 
-airline_subset_regression <- airline_data_new %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, ARRIVAL_DELAY)
+airline_subset_regression <- airline_data_new %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE)
 
 departure_delay_model <- lm(DEPARTURE_DELAY ~ ., airline_subset_regression)
 summary(departure_delay_model)
