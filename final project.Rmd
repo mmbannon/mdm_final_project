@@ -85,9 +85,9 @@ skim(airline_data)
 airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
                                             FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)))
 
-table(airline_data_new$FLIGHT_DELAY_5)
+table(airline_data_new$FLIGHT_DELAY_15)
 
-airline_pct_delay_15 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_15)  %>% group_by(AIRLINE, FLIGHT_DELAY_15) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_15==1) %>% select(AIRLINE, percent)
+airline_pct_delay_15 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_15)  %>% group_by(AIRLINE, FLIGHT_DELAY_15) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) #%>% drop_na() %>% filter(FLIGHT_DELAY_15==1) %>% select(AIRLINE, percent)
 
 head(airline_pct_delay_15, 20)
 
