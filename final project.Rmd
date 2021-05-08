@@ -47,11 +47,11 @@ Our response variable is [INSERT] which represents [INSERT].  [note: in process 
 ##Exhibit [##]
 
 @chris @charles - proposed managerial  questions [and analyses]
-+ What factors impact airline reliability the most? [logistic regression (lasso?) & random forest]
++ What factors impact airline reliability the most? [logistic regression on delay/cancellation & random forest]
   + What causes a delay vs. what causes a cancellation?
   + Is there a difference between departure delays and arrival delays?
 
-+ What factors impact the length of a cancellation? [multivariate regression (lasso?) & random forest]
++ What factors impact the length of a cancellation? [multivariate on departure delay and origin delay regression & random forest]
 
 [EDA for below?]
 + Which airlines are the most reliable?
