@@ -48,10 +48,9 @@ Our response variable is [INSERT] which represents [INSERT].  [note: in process 
 
 @chris @charles - proposed managerial  questions [and analyses]
 + What factors impact airline reliability the most? [logistic regression on delay/cancellation & random forest]
-  + What causes a delay vs. what causes a cancellation?
-  + Is there a difference between departure delays and arrival delays?
+   + Is there a difference between departure delays and arrival delays?
 
-+ What factors impact the length of a cancellation? [multivariate on departure delay and origin delay regression & random forest]
++ What factors impact the length of a Delay? [multivariate on departure delay and origin delay regression & random forest]
 
 [EDA for below?]
 + Which airlines are the most reliable?
@@ -81,7 +80,7 @@ airline_data<- airline_data %>% filter(!str_detect(ORIGIN_AIRPORT, '^1')) #impac
 
 ```
 ## Creating New Variables
-```{r create NEW variables, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
+```{r create NEW variables, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=TRUE}
 #creating new variables for flight data
 airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
                                             FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)), 
@@ -170,13 +169,15 @@ airline_data_new<-airline_data_new %>% mutate(
                                           Hub_System=factor(Hub_System),
                                           P2P=factor(P2P), 
                                           ORIGIN_BASE=factor(ORIGIN_BASE), 
-                                          DESTINATION_BASE=factor(DESTINATION_BASE))%>% 
+                                          DESTINATION_BASE=factor(DESTINATION_BASE), 
+                                          B2B=factor(B2B))%>% 
                                         select(-YEAR, - Date, -FLIGHT_NUMBER, -TAIL_NUMBER, -QUARTER, - QUATRER.F, -DAY)
  #PY = passenger yield, a measure of fare per mile per passenger  presented in cents per mile. 
 #ASM= available seat miles, a measure of the number of seats on the plane, times the distance, regardless of the occupation
 #SL= Stage Length: a measure of the distance flown in miles, per departure of aircraft. 
 #ESM: equivalent seat mile: a mesure of cross-carrier comparisons. 
 head(airline_data_new, 50)
+airline_data_new<-airline_data_new %>% mutate(B2B=factor(B2B))
 
 ```
 
@@ -296,20 +297,36 @@ data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE") # issue p
 ## Linear Regression for Delay
 ```{r create dataset with select variables for running regression}
 #names(data.train)
-data.train.sub<-data.train %>% select(-FLIGHT_DELAY_5, -DEPARTURE_DELAY, -ARRIVAL_DELAY, -DEPARTURE_TIME, -WHEELS_OFF, -WHEELS_ON, -ELAPSED_TIME, -ARRIVAL_TIME, -AIR_SYSTEM_DELAY, -SECURITY_DELAY, -AIRLINE_DELAY, -LATE_AIRCRAFT_DELAY, -WEATHER_DELAY, -AIRLINE_FULLNAME, -FLIGHT_LENGTH, -DATE, -Hub_1, -Hub_2, -Hub_3, -Hub_4, -Hub_5, -AIR_TIME, -CANCELLED, -CANCELLATION_REASON)
+data.train.sub<-data.train %>% select(-FLIGHT_DELAY_5, -DEPARTURE_DELAY, -ARRIVAL_DELAY, -DEPARTURE_TIME, -WHEELS_OFF, -WHEELS_ON, -ELAPSED_TIME, -ARRIVAL_TIME, -AIR_SYSTEM_DELAY, -SECURITY_DELAY, -AIRLINE_DELAY, -LATE_AIRCRAFT_DELAY, -WEATHER_DELAY, -AIRLINE_FULLNAME, -FLIGHT_LENGTH, -DATE, -Hub_1, -Hub_2, -Hub_3, -Hub_4, -Hub_5, -AIR_TIME, -CANCELLED, -ARRIVAL_TIME_OF_DAY, -CANCELLATION_REASON) %>% relocate(FLIGHT_DELAY_15)
 #names(data.train.sub)
-head(data.train.sub)
+skim(data.train.sub)
+prop.table(table(data.train.sub$FLIGHT_DELAY_15))
 ```
 ## delay Tree
 ```{r Logistic Tree For Delay, message=FALSE, warning=FALSE}
-tree1<-rpart(DEPARTURE_DELAY~., data=airline_subset_regression, minsplit=20, cp=.0005, xval=10)
-summary(tree1)
-tree1$variable.importance
-plot(tree1$variable.importance)
-delay.tree<-prune(tree1, cp=0.00265742) 
-plot(as.party(delay.tree), main="Delay Tree") 
-dt.test$pred<-predict(delay.tree, data.val)
-summary(delay.tree)
+data.train.sub.tree<-data.train.sub %>% select(-ORIGIN_AIRPORT_STATE, -DESTINATION_AIRPORT_STATE, -DESTINATION_AIRPORT, - ORIGIN_AIRPORT) # removing vars with > 32 factors per function
+tree.delay1<- tree(FLIGHT_DELAY_15~., data=data.train.sub.tree, control=tree.control(nrow(data.train.sub), mindev = 0.005), split="deviance")
+cv.dtree1<-cv.tree(tree.delay1, K=10, FUN=prune.tree) # check for cross-validation error 
+plot(cv.dtree1) # take 5
+cv.dtree1.pruned<-prune.misclass(tree.delay1, best=3)
+cv.dtree1.pruned
+plot(cv.dtree1.pruned)
+text(cv.dtree1.pruned)
+
+#rpart 
+rtree.d1<-rpart(FLIGHT_DELAY_15~., data=data.train.sub.tree, minsplit=1, method="class", cp=.0005)
+plot(as.party(rtree.d1))
 ```
+
+
+
+
+
+
+
+
+
+
+
 
 
