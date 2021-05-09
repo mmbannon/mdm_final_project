@@ -60,7 +60,7 @@ Our response variable is [INSERT] which represents [INSERT].  [note: in process 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr, data.table, stringr, rpart, tree, partykit, lubridate, zoo, ragtop)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr, data.table, stringr, rpart, tree, partykit, lubridate, zoo, ragtop, ranger, randomForest, pROC)   #add your packages here
 ```
 
 ```{r data upload, include=FALSE}
@@ -290,7 +290,7 @@ data.train<-airline_data_new[train.index]# extract the index
 data.val<-airline_data_new[-train.index]
 
 data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE") # issue predictinv because this factor was missing. 
-
+data.val <- data.val %>% drop_na()
 #use data.train
 ```
 
@@ -321,11 +321,109 @@ rtree.d1.prune<-prune.rpart(rtree.d1, cp= 0.0021186442)
 plot(as.party(rtree.d1.prune))
 ```
 
+```{r random forest for delay, message=FALSE, warning=FALSE}
+set.seed(150)
+
+rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data.train.sub.tree)], mtry=5, num.trees=1000)
+plot(rf) # 250 trees
+
+
+rf.error.p <- 1:31 # set up a vector of length 19
+for (p in 1:31) # repeat the following code inside { } 19 times
+{
+fit.rf <- ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=p, num.trees=250, splitrule="gini", importance="impurity", probability=T)
+
+rf.error.p[p] <- fit.rf$prediction.error # collecting oob mse based on 250 trees
+}
+rf.error.p # oob mse returned: should be a vector of 19
+plot(1:31, rf.error.p, pch=16,
+xlab="mtry",
+ylab="OOB mse of mtry",
+main = "Testing errors as func of mtry with delay as response")
+lines(1:31, rf.error.p) # 5 mtries 
+
+
+
+delay.ranger<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=5, num.trees=250, splitrule="gini", importance="impurity", probability=F, classification = T)
+delay.ranger.p<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=5, num.trees=250, splitrule="gini", importance="impurity", probability=T, classification = F)
+summary(delay.ranger)
+  ranger.delay.imp<-delay.ranger$variable.importance
+  delay.imp<-data.frame(ranger.delay.imp)
+  delay.imp$vars<-rownames(delay.imp)
+  delay.imp<- delay.imp %>% rename(Gini_Reduction = "ranger.delay.imp")
+
+
+delay.rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data.train.sub.tree)], mtry=5, num.trees=250)
+  delay.imp.1<-randomForest::importance(delay.rf,type=2)
+  delay.imp.1<-delay.imp.1[order(delay.imp.1,decreasing=T),]
+  delay.imp.1<-data.frame(delay.imp.1)
+  delay.imp.1$vars<-rownames(delay.imp.1)
+  delay.imp.1<-delay.imp.1 %>% rename(majority_vote="delay.imp.1")
+  delay.imp.1
+delay.imp<-left_join(delay.imp, delay.imp.1, by="vars") %>% relocate(vars) %>% arrange(-Gini_Reduction)
+head(delay.imp, 15)
+```
+
+```{r preidcting delay with lasso, message=FALSE, warning=FALSE}
+
+
+
+
+```
 
 
 
 
 
+
+
+```{r comparing predictions ranger and random forest, message=FALSE, warning=FALSE}
+#validaiton error for RF
+fit.rf.delay.predict.y<-predict(delay.rf, newdata=data.val)
+  fit.rf.delay.predic<-predict(delay.rf, newdata = data.val, type="prob")
+# testing error
+  rf.test.err<-mean(data.val$FLIGHT_DELAY_15 != fit.rf.delay.predict.y)
+      rf.roc<-roc(data.val$FLIGHT_DELAY_15, fit.rf.delay.predic[,2], plot=T)
+      rf.test.err
+      rf.roc
+    delay.rf.auc<-auc(rf.roc)
+
+#validation error for Ranger
+    #validaiton error 
+fit.ranger.delay.predict.y<-predict(delay.ranger, data =data.val, predict.all = F)
+  fit.ranger.delay.predic<-predict(delay.ranger.p, data=data.val, type="response", probability=T)
+    fit.ranger.delay.predic$predictions<-c(fit.ranger.delay.predic$predictions)
+    fit.ranger.delay.predic$predictions
+    # testing error
+  ranger.test.err<-mean(data.val$FLIGHT_DELAY_15 != fit.ranger.delay.predict.y$predictions)
+      ranger.test.err
+      ranger.roc<-roc(data.val$FLIGHT_DELAY_15, fit.ranger.delay.predic$predictions[,2], plot=T)
+      plot(ranger.roc)
+      ranger.auc<-auc<-ranger.roc
+    delay.ranger.auc<-auc(ranger.roc)
+
+
+
+
+Delay.Errors<-data.frame(delay.rf$err.rate[250])
+  colnames(Delay.Errors)<-"training OOB error"
+  Delay.Errors$model<-"Random Forest Classification with MV"
+  Delay.Errors$AUC<-round(delay.rf.auc,3)
+  Delay.Errors$testing<-round(rf.test.err,3)
+
+Delay.Errors.ranger<-data.frame(delay.ranger.p$prediction.error)
+    colnames(Delay.Errors.ranger)<-"training OOB error"
+  Delay.Errors.ranger$model<-"Random Forest Classification with Gini"
+  Delay.Errors.ranger$AUC<-round(delay.ranger.auc,3)
+  Delay.Errors.ranger$testing<-round(ranger.test.err,3)
+
+
+  
+rbind(Delay.Errors, Delay.Errors.ranger)
+names(Delay.Errors)
+names(Delay.Errors.ranger)
+
+```
 
 
 
