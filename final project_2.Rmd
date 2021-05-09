@@ -314,8 +314,11 @@ plot(cv.dtree1.pruned)
 text(cv.dtree1.pruned)
 
 #rpart 
-rtree.d1<-rpart(FLIGHT_DELAY_15~., data=data.train.sub.tree, minsplit=1, method="class", cp=.0005)
-plot(as.party(rtree.d1))
+rtree.d1<-rpart(FLIGHT_DELAY_15~., data=data.train.sub.tree, minsplit=1, method="class", cp=.0005, xval=10)
+plotcp(rtree.d1)
+printcp(rtree.d1)
+rtree.d1.prune<-prune.rpart(rtree.d1, cp= 0.0021186442)
+plot(as.party(rtree.d1.prune))
 ```
 
 
