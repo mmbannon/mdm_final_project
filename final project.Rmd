@@ -75,7 +75,7 @@ diagnose(airline_data)
 
 tail(airline_data, 50)
 
-skim(airline_data)
+#skim(airline_data)
 #remove rando airports
 airline_data<- airline_data %>% filter(!str_detect(ORIGIN_AIRPORT, '^1')) #impact of removing all airlines in october
 
@@ -93,7 +93,9 @@ airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_D
                                             LATE_AIRCRAFT_DELAY = ifelse(is.na(LATE_AIRCRAFT_DELAY)==TRUE, 0, 1),
                                             WEATHER_DELAY = ifelse(is.na(WEATHER_DELAY)==TRUE, 0, 1))
 
+
 #subsetting aiport and census data 
+
 airport_data_new <- airport_data %>% 
   select(IATA_CODE, STATE)
 
@@ -127,8 +129,8 @@ round(prop.table(table(airline_data$AIRLINE)),2)
 round(prop.table(table(airline_data_new$AIRLINE)),2)
 round(prop.table(table(airline_data$MONTH)),2)
 round(prop.table(table(airline_data_new$MONTH)),2)
-round(prop.table(table(airline_data$ORIGIN_AIRPORT)),2)
-round(prop.table(table(airline_data_new$ORIGIN_AIRPORT)),2)
+#round(prop.table(table(airline_data$ORIGIN_AIRPORT)),2)
+#round(prop.table(table(airline_data_new$ORIGIN_AIRPORT)),2)
 dim(airline_data_new)
 ```
 ## Data Viz Work 
@@ -157,6 +159,10 @@ head(airline_pct_cancelled, 20)
 
 ```{r create separate datasets for bar charts for fligth delays/diversions/cancellations by airport}
 #pct of flights delayed using standard definition ... for some reason airport codes showing up as numbers (factor levels?)??
+```
+```{r histogram of delay times to help with new var creation}
+airline_data_new %>% ggplot(aes(x=DEPARTURE_DELAY, y=..density.., fill="blue"))+
+                      geom_histogram()
 
 ```
 
@@ -220,7 +226,7 @@ data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE")
 #use data.train
 ```
 
-## Logistic Regression for Delay
+## Linear Regression for Delay
 ```{r create dataset with select variables for running regression}
 
 airline_subset_regression <- data.train %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, -ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE)
@@ -232,7 +238,9 @@ summary(departure_delay_model)
 ## delay Tree
 ```{r Classification Tree For Delay, message=FALSE, warning=FALSE}
 tree1<-rpart(DEPARTURE_DELAY~., data=airline_subset_regression, minsplit=20, cp=.0005, xval=10)
-plotcp(tree1)
+summary(tree1)
+tree1$variable.importance
+plot(tree1$variable.importance)
 delay.tree<-prune(tree1, cp=0.00265742) 
 plot(as.party(delay.tree), main="Delay Tree") 
 dt.test$pred<-predict(delay.tree, data.val)
