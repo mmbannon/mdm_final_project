@@ -1,0 +1,310 @@
+---
+title: "Final Project"
+author: Madeleine Bannon
+author: Chris Coelho
+author: 
+output: html_document
+---
+@chris @charles - this is the outline for our writeup. feel free to add and/or edit it. 
+#Executive summary
+##Goal of the study
+In the last year, the airline industry has experienced an industry upheaval amid the COVID-19 pandemic. However, with contrainment progress from the rollout of the COVID-19 pandemic, traveler confidence has increasingly been restored. As such, as airlines and travelers return to pre-pandemic travel patterns, we thought it would be interesting to explore flight route patterns to better understand airline and airport reliaiblity.
+
+In this study, we aim to answer the following questions: 
++ What factors impact airline reliability the most? 
+  + What causes a delay vs. what causes a cancellation?
+  + Is there a difference between departure delays and arrival delays?
++ What factors impact the length of a cancellation? 
++ Which airlines are the most reliable?
++ Which locations experience the least amount of delays?
++ How does time of year impact flight reliability?
+
+##Background
+
+Delays have plagued the air transportation industry since its inception, and remain a consistent pain point for most, if not all airlines today. In 2019, the United States Department of Transportation ("US DOT") reported that airline reliability performance worsened from the previous year, noting that 79% of all flights arrived on-time. However, "on-time" is defined as "one that arrives no more than 15 minutes after its scheduled arrival," a time frame that could easily result in a missed connection (NYT).
+
+source: https://www.nytimes.com/2020/02/19/business/air-travel-delays-airlines.html
+
+
+##Data
+This dataset is from the United States Department of Travel Air Travel Consumer Report and includes records for 5M+ commercial airline flights in 2015. Each record represents a single flight (one-way) including information about the flight, such as the airline, origin/destination airport, schedule/actual flight times (departure and arrival).
+
+###Data cleanup and extraction
+
+[INSERT ANY CHANGES TO DATA HERE]
+
+###Predictor variables
+Our response variable is [INSERT] which represents [INSERT].  [note: in process of creating binary for delayed or not delayed, maybe also include general issue variable for delay, cancelled, diverted]
+
+[INSERT TABLE OF ALL VARIABLES]
+##Findings
+
+#Detailed analysis
+##Model 1 [to be filled in further]
+##Model 2 [to be filled in further]
+#Appendix
+##Exhibit 1
+##Exhibit [##]
+
+@chris @charles - proposed managerial  questions [and analyses]
++ What factors impact airline reliability the most? [logistic regression on delay/cancellation & random forest]
+  + What causes a delay vs. what causes a cancellation?
+  + Is there a difference between departure delays and arrival delays?
+
++ What factors impact the length of a cancellation? [multivariate on departure delay and origin delay regression & random forest]
+
+[EDA for below?]
++ Which airlines are the most reliable?
++ Which locations experience the least amount of delays?
++ How does time of year impact flight reliability?
+# Set up
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
+if(!require("pacman")) install.packages("pacman")
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr, data.table, stringr, rpart, tree, partykit, lubridate, zoo, ragtop)   #add your packages here
+```
+
+```{r data upload, include=FALSE}
+airline_data <- fread("data/flights.csv")
+airport_data <- read.csv("data/airports.csv")
+census_data <- read.csv("data/census.csv")
+airline_stats <- read.csv("data/airlines1.csv")
+```
+# EDA
+```{r general EDA}
+#diagnose(airline_data)
+#tail(airline_data, 50)
+#skim(airline_data)
+#remove rando airports
+
+airline_data<- airline_data %>% filter(!str_detect(ORIGIN_AIRPORT, '^1')) #impact of removing all airlines in october
+
+```
+## Creating New Variables
+```{r create NEW variables, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
+#creating new variables for flight data
+airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
+                                            FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)), 
+                                            DEPARTURE_TIME_OF_DAY = ifelse(SCHEDULED_DEPARTURE>1200, "PM", "AM"), 
+                                            ARRIVAL_TIME_OF_DAY = ifelse(ARRIVAL_TIME>1200, "PM", "AM"),
+                                            AIR_SYSTEM_DELAY = ifelse(is.na(AIR_SYSTEM_DELAY)==TRUE, 0, 1),
+                                            SECURITY_DELAY = ifelse(is.na(SECURITY_DELAY)==TRUE, 0, 1),
+                                            AIRLINE_DELAY = ifelse(is.na(AIRLINE_DELAY)==TRUE, 0, 1),
+                                            LATE_AIRCRAFT_DELAY = ifelse(is.na(LATE_AIRCRAFT_DELAY)==TRUE, 0, 1),
+                                            WEATHER_DELAY = ifelse(is.na(WEATHER_DELAY)==TRUE, 0, 1))
+
+
+
+airline_stats <- airline_stats %>% rename(AIRLINE_FULLNAME = AIRLINE)
+
+#head(airline_stats)
+#head(airline_data)
+
+#subsetting aiport and census data 
+airport_data_new <- airport_data %>% 
+  select(IATA_CODE, STATE)
+
+census_data_new <- census_data %>%
+ select(State.Code, Region, Division)
+
+#merging our state data with flight data
+airline_data_new <- left_join(airline_data_new, airport_data_new, by = c("ORIGIN_AIRPORT"="IATA_CODE"))
+airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_STATE = STATE)
+airline_data_new <- left_join(airline_data_new, airport_data_new, by = c("DESTINATION_AIRPORT"="IATA_CODE"))
+airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_STATE = STATE)
+
+#merging census descriptive data with flight data 
+airline_data_new <- left_join(airline_data_new, census_data_new, by = c("ORIGIN_AIRPORT_STATE"="State.Code"))
+airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_REGION = Region)
+airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_DIVISION = Division)
+airline_data_new <- left_join(airline_data_new, census_data_new, by = c("DESTINATION_AIRPORT_STATE"="State.Code"))
+airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_REGION = Region)
+airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_DIVISION = Division)
+
+
+
+
+#mergining airline descriptive data with flight data 
+airline_data_new <- left_join(airline_data_new, airline_stats, by = c("AIRLINE"="IATA_CODE"))
+
+airline_data_new <- airline_data_new %>% mutate(ORIGIN_BASE = ifelse(ORIGIN_AIRPORT==Hub_1, 1, ifelse(ORIGIN_AIRPORT==Hub_2, 1, ifelse(ORIGIN_AIRPORT==Hub_3, 1, ifelse(ORIGIN_AIRPORT==Hub_4, 1, ifelse(ORIGIN_AIRPORT==Hub_5, 1, 0))))),
+                                                DESTINATION_BASE = ifelse(DESTINATION_AIRPORT==Hub_1, 1, ifelse(DESTINATION_AIRPORT==Hub_2, 1, ifelse(DESTINATION_AIRPORT==Hub_3, 1, ifelse(DESTINATION_AIRPORT==Hub_4, 1, ifelse(DESTINATION_AIRPORT==Hub_5, 1, 0))))), 
+                                                B2B = ifelse(ORIGIN_BASE == DESTINATION_BASE, 1, 0)) 
+# Recoding the data 
+
+airline_data_new<-airline_data_new %>% mutate(
+                                          Date=paste(YEAR,"-",MONTH,"-",DAY),
+                                          DATE=ymd(Date),
+                                          QUARTER=quarter(DATE),
+                                          MONTH=month(DATE),
+                                          MONTH=factor(MONTH),
+                                          DAY=day(DATE),
+                                          DAY=factor(DAY),
+                                          QUATRER.F=factor(QUARTER), 
+                                          DAY_OF_WEEK=factor(DAY_OF_WEEK), 
+                                          AIRLINE=factor(AIRLINE),
+                                          ORIGIN_AIRPORT=factor(ORIGIN_AIRPORT), 
+                                          DESTINATION_AIRPORT=factor(DESTINATION_AIRPORT),
+                                          FLIGHT_LENGTH=round((SCHEDULED_TIME/60),0),
+                                          FLIGHT_LENGTH.F=ifelse(FLIGHT_LENGTH<=2, "Short",ifelse(FLIGHT_LENGTH>2 & FLIGHT_LENGTH<=7, "Medium", "Long.Haul")), 
+                                          SEASON=case_when(
+                                            DATE %within% c(interval(ymd("2015-03-01"), ymd("2015-05-31"))) ~"Spring", 
+                                            DATE %within% c(interval(ymd("2015-06-01"), ymd("2015-08-31"))) ~"Summer",
+                                            DATE %within% c(interval(ymd("2015-09-01"), ymd("2015-11-30"))) ~"Autumn",
+                                            DATE %within% c(interval(ymd("2015-12-01"), ymd("2015-12-31"))) ~"Winter",
+                                            DATE %within% c(interval(ymd("2015-01-01"), ymd("2015-03-01"))) ~"Winter"),
+                                          SEASON=factor(SEASON), 
+                                          DESTINATION_AIRPORT_STATE=factor(DESTINATION_AIRPORT_STATE),
+                                          ORIGIN_AIRPORT_REGION=factor(ORIGIN_AIRPORT_REGION),
+                                          ORIGIN_AIRPORT_DIVISION=factor(ORIGIN_AIRPORT_DIVISION), 
+                                          DESTINATION_AIRPORT_REGION=factor(DESTINATION_AIRPORT_REGION),
+                                          DESTINATION_AIRPORT_DIVISION=factor(DESTINATION_AIRPORT_DIVISION),
+                                          Tier=factor(Tier), 
+                                          CANCELLATION_REASON=replace_na(CANCELLATION_REASON, "blank"),
+                                          CANCELLATION_REASON=factor(CANCELLATION_REASON))
+                                 
+                                      #SELECT(-YEAR, - Date, -FLIGHT_NUMBER, -TAIL_NUMBER, -QUARTER, - Quarter.F, -DAY)
+head(airline_data_new)
+round(prop.table(table(airline_data_new$FLIGHT_LENGTH)),2)
+table(airline_data_new$CANCELLATION_REASON)
+
+```
+
+## Selecting a subset of data
+```{r}
+
+#our dataset is way too big to run a regression on.. LOL
+set.seed(100)
+airline_data_new <- sample_frac(airline_data_new, .005)
+#check that it matches original data
+round(prop.table(table(airline_data$AIRLINE)),2)
+round(prop.table(table(airline_data_new$AIRLINE)),2)
+round(prop.table(table(airline_data$MONTH)),2)
+round(prop.table(table(airline_data_new$MONTH)),2)
+#round(prop.table(table(airline_data$ORIGIN_AIRPORT)),2)
+#round(prop.table(table(airline_data_new$ORIGIN_AIRPORT)),2)
+dim(airline_data_new)
+```
+## Data Viz Work 
+```{r create separate datasets for bar charts for fligth delays/diversions/cancellations by airline}
+#pct of flights delayed using standard definition 
+airline_pct_delay_15 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_15)  %>% group_by(AIRLINE, FLIGHT_DELAY_15) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_15==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_delay_15, 20)
+
+#if definition of delay were 5 mins vs. 15
+airline_pct_delay_5 <- airline_data_new %>% select(AIRLINE, FLIGHT_DELAY_5) %>% group_by(AIRLINE, FLIGHT_DELAY_5) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(FLIGHT_DELAY_5==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_delay_5, 20)
+
+#pct of flights diverted
+airline_pct_diverted <- airline_data_new %>% select(AIRLINE, DIVERTED) %>% group_by(AIRLINE, DIVERTED) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% filter(DIVERTED==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_diverted, 20)
+
+#pct of flights cancelled
+airline_pct_cancelled <- airline_data_new %>% select(AIRLINE, CANCELLED) %>% group_by(AIRLINE, CANCELLED) %>% summarize(subtotals = n()) %>% mutate(percent = (subtotals / sum(subtotals) * 100)) %>% drop_na() %>% filter(CANCELLED==1) %>% select(AIRLINE, percent)
+
+head(airline_pct_cancelled, 20)
+
+```
+
+```{r create separate datasets for bar charts for fligth delays/diversions/cancellations by airport}
+#pct of flights delayed using standard definition ... for some reason airport codes showing up as numbers (factor levels?)??
+```
+
+```{r histogram of delay times to help with new var creation}
+airline_data_new %>% ggplot(aes(x=DEPARTURE_DELAY, y=..density.., fill="blue"))+
+                      geom_histogram()
+
+```
+
+```{r total flights flown by each airline}
+
+total_flights <- ggplot(airline_data_new, aes(x=AIRLINE)) + 
+  geom_bar()
+
+print(total_flights)
+```
+
+```{r absolute number of flights delayed/diverted/ cancelled by airline}
+airline_delay  <- ggplot(airline_data_new, aes(x=AIRLINE, y=FLIGHT_DELAY_15)) + 
+  geom_bar(stat = "identity")
+
+airline_diverted <- ggplot(airline_data_new, aes(x=AIRLINE, y=DIVERTED)) + 
+  geom_bar(stat = "identity")
+
+airline_cancelled <- ggplot(airline_data_new, aes(x=AIRLINE, y=CANCELLED)) + 
+  geom_bar(stat = "identity")
+
+print(airline_delay)
+print(airline_diverted)
+print(airline_cancelled )
+```
+
+```{r flight delay percentage using standard delay definition}
+
+total_flights_delayed_pct <- ggplot(airline_pct_delay_15, aes(x=reorder(AIRLINE, -percent), y=percent)) + 
+  geom_bar(stat = "identity")
+
+print(total_flights_delayed_pct)
+
+```
+
+```{r flight departure delay percentage using standard delay definition by airport}
+
+#origin_delayed_pct <- ggplot(origin_pct_delay_15, aes(x=reorder(ORIGIN_AIRPORT, -percent), y=percent)) + 
+  #geom_bar(stat = "identity")
+
+#print(origin_delayed_pct)
+
+```
+
+```{r pct of flights cancelled bar chart}
+
+total_flights_cancelled_pct <- ggplot(airline_pct_cancelled, aes(x=reorder(AIRLINE, -percent), y=percent)) + 
+  geom_bar(stat = "identity")
+
+print(total_flights_cancelled_pct)
+
+```
+# Model Building
+```{r split data for training vs. validation}
+set.seed(150)
+nsplit<-nrow(airline_data_new)#count rows
+n1<-(2/3)*nsplit #get 2/3
+train.index<-sample(nsplit,n1,replace=FALSE) #sample 2/3
+data.train<-airline_data_new[train.index]# extract the index
+data.val<-airline_data_new[-train.index]
+
+data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE") # issue predictinv because this factor was missing. 
+
+#use data.train
+```
+
+## Linear Regression for Delay
+```{r create dataset with select variables for running regression}
+
+airline_subset_regression <- data.train %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, -ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE)
+
+
+airline_subset_regression <- data.train %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, -ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE, DEPARTURE_TIME_OF_DAY, -ARRIVAL_TIME_OF_DAY)
+
+
+names(data.train)
+data.train.sub<-data.train %>% select(-FLIGHT_DELAY_5, -DEPARTURE_DELAY, -ARRIVAL_DELAY, -CANCELLEATION_REASON, -TAIL_NUMBER, -YEAR, -FLIGHT_NUMBER, -DEPARTURE_TIME, -WHEELS_OFF, -WHEELS_ON)
+
+```
+## delay Tree
+```{r Regression Tree For Delay, message=FALSE, warning=FALSE}
+tree1<-rpart(DEPARTURE_DELAY~., data=airline_subset_regression, minsplit=20, cp=.0005, xval=10)
+summary(tree1)
+tree1$variable.importance
+plot(tree1$variable.importance)
+delay.tree<-prune(tree1, cp=0.00265742) 
+plot(as.party(delay.tree), main="Delay Tree") 
+dt.test$pred<-predict(delay.tree, data.val)
+summary(delay.tree)
+```
+
+
