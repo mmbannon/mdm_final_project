@@ -170,7 +170,8 @@ airline_data_new<-airline_data_new %>% mutate(
                                           P2P=factor(P2P), 
                                           ORIGIN_BASE=factor(ORIGIN_BASE), 
                                           DESTINATION_BASE=factor(DESTINATION_BASE), 
-                                          B2B=factor(B2B))%>% 
+                                          B2B=factor(B2B),
+                                          DIVERTED=factor(DIVERTED))%>% 
                                         select(-YEAR, - Date, -FLIGHT_NUMBER, -TAIL_NUMBER, -QUARTER, - QUATRER.F, -DAY)
  #PY = passenger yield, a measure of fare per mile per passenger  presented in cents per mile. 
 #ASM= available seat miles, a measure of the number of seats on the plane, times the distance, regardless of the occupation
@@ -297,7 +298,7 @@ data.val <- data.val %>% drop_na()
 ## Linear Regression for Delay
 ```{r create dataset with select variables for running regression}
 #names(data.train)
-data.train.sub<-data.train %>% select(-FLIGHT_DELAY_5, -DEPARTURE_DELAY, -ARRIVAL_DELAY, -DEPARTURE_TIME, -WHEELS_OFF, -WHEELS_ON, -ELAPSED_TIME, -ARRIVAL_TIME, -AIR_SYSTEM_DELAY, -SECURITY_DELAY, -AIRLINE_DELAY, -LATE_AIRCRAFT_DELAY, -WEATHER_DELAY, -AIRLINE_FULLNAME, -FLIGHT_LENGTH, -DATE, -Hub_1, -Hub_2, -Hub_3, -Hub_4, -Hub_5, -AIR_TIME, -CANCELLED, -ARRIVAL_TIME_OF_DAY, -CANCELLATION_REASON) %>% relocate(FLIGHT_DELAY_15)
+data.train.sub<-data.train %>% select(-FLIGHT_DELAY_5, -DEPARTURE_DELAY, -ARRIVAL_DELAY, -DEPARTURE_TIME, -WHEELS_OFF, -WHEELS_ON, -ELAPSED_TIME, -ARRIVAL_TIME, -AIR_SYSTEM_DELAY, -SECURITY_DELAY, -AIRLINE_DELAY, -LATE_AIRCRAFT_DELAY, -WEATHER_DELAY, -AIRLINE_FULLNAME, -FLIGHT_LENGTH, -DATE, -Hub_1, -Hub_2, -Hub_3, -Hub_4, -Hub_5, -AIR_TIME, -CANCELLED, -ARRIVAL_TIME_OF_DAY, -CANCELLATION_REASON, -DIVERTED, -TAXI_IN) %>% relocate(FLIGHT_DELAY_15)
 #names(data.train.sub)
 skim(data.train.sub)
 prop.table(table(data.train.sub$FLIGHT_DELAY_15))
@@ -307,7 +308,7 @@ prop.table(table(data.train.sub$FLIGHT_DELAY_15))
 data.train.sub.tree<-data.train.sub %>% select(-ORIGIN_AIRPORT_STATE, -DESTINATION_AIRPORT_STATE, -DESTINATION_AIRPORT, - ORIGIN_AIRPORT) # removing vars with > 32 factors per function
 tree.delay1<- tree(FLIGHT_DELAY_15~., data=data.train.sub.tree, control=tree.control(nrow(data.train.sub), mindev = 0.005), split="deviance")
 cv.dtree1<-cv.tree(tree.delay1, K=10, FUN=prune.tree) # check for cross-validation error 
-plot(cv.dtree1) # take 5
+plot(cv.dtree1) # take 3
 cv.dtree1.pruned<-prune.misclass(tree.delay1, best=3)
 cv.dtree1.pruned
 plot(cv.dtree1.pruned)
@@ -317,8 +318,8 @@ text(cv.dtree1.pruned)
 rtree.d1<-rpart(FLIGHT_DELAY_15~., data=data.train.sub.tree, minsplit=1, method="class", cp=.0005, xval=10)
 plotcp(rtree.d1)
 printcp(rtree.d1)
-rtree.d1.prune<-prune.rpart(rtree.d1, cp= 0.0021186442)
-plot(as.party(rtree.d1.prune))
+rtree.d1.prune<-prune.rpart(rtree.d1, cp= 0.00154083       )
+plot(as.party(rtree.d1.prune), gp=gpar(fontsize=7))
 ```
 
 ```{r random forest for delay, message=FALSE, warning=FALSE}
@@ -328,8 +329,8 @@ rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data
 plot(rf) # 250 trees
 
 
-rf.error.p <- 1:31 # set up a vector of length 19
-for (p in 1:31) # repeat the following code inside { } 19 times
+rf.error.p <- 1:31 # set up a vector of length 31
+for (p in 1:31) # repeat the following code inside { } 31 times
 {
 fit.rf <- ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=p, num.trees=250, splitrule="gini", importance="impurity", probability=T)
 
@@ -341,8 +342,6 @@ xlab="mtry",
 ylab="OOB mse of mtry",
 main = "Testing errors as func of mtry with delay as response")
 lines(1:31, rf.error.p) # 5 mtries 
-
-
 
 delay.ranger<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=5, num.trees=250, splitrule="gini", importance="impurity", probability=F, classification = T)
 delay.ranger.p<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=5, num.trees=250, splitrule="gini", importance="impurity", probability=T, classification = F)
@@ -362,11 +361,20 @@ delay.rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.case
   delay.imp.1
 delay.imp<-left_join(delay.imp, delay.imp.1, by="vars") %>% relocate(vars) %>% arrange(-Gini_Reduction)
 head(delay.imp, 15)
+write_csv(delay.imp, "data/delay_importance_factors.csv")
 ```
 
 ```{r preidcting delay with lasso, message=FALSE, warning=FALSE}
+data.train.sub<-data.train.sub %>% mutate(B2B=factor(B2B))
+data.train.sub.lasso<-data.train.sub %>% drop_na()
 
-
+X<-model.matrix(FLIGHT_DELAY_15~., data=data.train.sub.lasso)[,-1]
+Y<-as.matrix(data.train.sub.lasso$FLIGHT_DELAY_15)
+fit.lasso<-cv.glmnet(X,Y, alpha=1, family="binomial", type.measure="deviance", nfolds=10)
+plot(fit.lasso) # use 1.se 
+coef.1se<-coef(fit.lasso, s="lambda.1se") # month, airline, 
+coef.1se<-coef.1se[which(coef.1se !=0),]
+coef.1se
 
 
 ```
