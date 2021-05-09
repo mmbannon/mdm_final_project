@@ -61,7 +61,7 @@ Our response variable is [INSERT] which represents [INSERT].  [note: in process 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
-pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr, data.table, stringr, rpart, tree, partykit)   #add your packages here
+pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr, data.table, stringr, rpart, tree, partykit, lubridate, zoo)   #add your packages here
 ```
 
 ```{r data upload, include=FALSE}
@@ -91,8 +91,7 @@ airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_D
                                             SECURITY_DELAY = ifelse(is.na(SECURITY_DELAY)==TRUE, 0, 1),
                                             AIRLINE_DELAY = ifelse(is.na(AIRLINE_DELAY)==TRUE, 0, 1),
                                             LATE_AIRCRAFT_DELAY = ifelse(is.na(LATE_AIRCRAFT_DELAY)==TRUE, 0, 1),
-                                            WEATHER_DELAY = ifelse(is.na(WEATHER_DELAY)==TRUE, 0, 1),
-                                            case_when(FLIGHT_DELAY_15 == 1 | FLIGHT_DELAY_5 == 1 ~ "delay"))
+                                            WEATHER_DELAY = ifelse(is.na(WEATHER_DELAY)==TRUE, 0, 1))
 
 
 #subsetting aiport and census data 
@@ -117,6 +116,26 @@ airline_data_new <- left_join(airline_data_new, census_data_new, by = c("DESTINA
 airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_REGION = Region)
 airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_DIVISION = Division)
 
+# Recoding the data 
+tail(airline_data)
+str(airline_data_new)
+airline_data_new<-airline_data_new %>% mutate(
+                                          Date=paste(YEAR,"-",MONTH,"-",DAY),
+                                          DATE=ymd(Date),
+                                          QUARTER=quarter(DATE),
+                                          MONTH=month(DATE),
+                                          MONTH=factor(MONTH),
+                                          DAY=day(DATE),
+                                          DAY=factor(DAY),
+                                          QUATER=factor(QUARTER), 
+                                          DAY_OF_WEEK=factor(DAY_OF_WEEK), 
+                                          AIRLINE=factor(AIRLINE),
+                                          ORIGIN_AIRPORT=factor(ORIGIN_AIRPORT), 
+                                          DESTINATION_AIRPORT=factor(DESTINATION_AIRPORT),
+                                          FLIGHT_LENGTH=round((SCHEDULED_TIME/60),0))
+                                      #SELECT(-YEAR, - Date, -FLIGHT_NUMBER, -TAIL_NUMBER)
+
+round(prop.table(table(airline_data_new$FLIGHT_LENGTH)),2)
 ```
 
 ## Selecting a subset of data
@@ -218,6 +237,7 @@ print(total_flights_cancelled_pct)
 ```
 # Model Building
 ```{r split data for training vs. validation}
+set.seed(150)
 nsplit<-nrow(airline_data_new)#count rows
 n1<-(2/3)*nsplit #get 2/3
 train.index<-sample(nsplit,n1,replace=FALSE) #sample 2/3
@@ -229,15 +249,14 @@ data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE") # issue p
 
 ## Linear Regression for Delay
 ```{r create dataset with select variables for running regression}
-
 airline_subset_regression <- data.train %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, -ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE)
 
-departure_delay_model <- lm(DEPARTURE_DELAY ~ ., airline_subset_regression)
-summary(departure_delay_model)
+names(data.train)
+data.train.sub<-data.train %>% select(-FLIGHT_DELAY_5, -DEPARTURE_DELAY, -ARRIVAL_DELAY, -CANCELLEATION_REASON, -TAIL_NUMBER, -YEAR, -FLIGHT_NUMBER, -DEPARTURE_TIME, -WHEELS_OFF, -WHEELS_ON)
 
 ```
 ## delay Tree
-```{r Classification Tree For Delay, message=FALSE, warning=FALSE}
+```{r Regression Tree For Delay, message=FALSE, warning=FALSE}
 tree1<-rpart(DEPARTURE_DELAY~., data=airline_subset_regression, minsplit=20, cp=.0005, xval=10)
 summary(tree1)
 tree1$variable.importance
