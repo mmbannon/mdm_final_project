@@ -1,0 +1,15 @@
+IATA_CODE,AIRLINE,Tier,PRESM_SL_Adj_2014,PY_SL_Adj_2014,ASMs_Emp_2014,Aircraft_Utilization,Hub_1,Hub_2,Hub_3,Hub_4,Hub_5,Hub_System,P2P
+UA,United Air Lines Inc.,Full Service,14.89,17.81,2.53,10.42,ORD,DEN,IAH,LAX,EWR,1,0
+AA,American Airlines Inc.,Full Service,13.55,16.51,2.56,9.84,DFW,CLT,ORD,LAX,MIA,1,0
+US,US Airways Inc.,Full Service,11.52,13.89,2.43,10.01,CLT,PHL,PHX,DCA,0,1,0
+F9,Frontier Airlines Inc.,Low Cost,8.76,9.85,3.19,11.45,DEN,0,0,0,0,0,1
+B6,JetBlue Airways,Low Cost,11.29,13.44,3.36,11.77,JFK,BOS,0,0,0,0,1
+OO,Skywest Airlines Inc.,Regional,9.76,11.45,3.41,9.59,ORD,SEA,LAX,0,0,0,1
+AS,Alaska Airlines Inc.,Other,11.58,13.52,3.1,10.5,SEA,ANC,LAX,PDX,SFO,1,0
+NK,Spirit Air Lines,Low Cost,6.74,7.81,8.46,12.75,MCO,DFW,MCO,LAS,DTW,0,1
+WN,Southwest Airlines Co.,Low Cost,10.43,12.67,2.97,11.01,PHX,DAL,OAK,DEN,MDW,0,1
+DL,Delta Air Lines Inc.,Full Service,13.09,15.33,2.72,10.23,ATL,BOS,DTW,LAX,MSP,1,0
+EV,Atlantic Southeast Airlines,Regional,9.76,11.45,3.41,9.59,ORD,ATL,IAD,DTW,0,0,1
+HA,Hawaiian Airlines Inc.,Other,9.86,12.13,3.18,9.48,HNL,OGG,0,0,0,1,0
+MQ,American Eagle Airlines Inc.,Regional,9.76,11.45,3.41,9.59,DFW,CLT,ORD,LAX,MIA,0,0
+VX,Virgin America,Other,11.84,14.37,4.92,11.33,SFO,LAX,DFW,0,0,1,0

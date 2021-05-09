@@ -65,18 +65,18 @@ pacman::p_load(dplyr, ggplot2, glmnet, car, data.table, tidyverse, dlookr, skimr
 ```
 
 ```{r data upload, include=FALSE}
-airline_data <- fread("data/flights.csv", stringsAsFactors = FALSE)
-airport_data <- read.csv("data/airports.csv", stringsAsFactors = FALSE)
-census_data <- read.csv("data/census.csv", stringsAsFactors = FALSE)
+airline_data <- fread("data/flights.csv")
+airport_data <- read.csv("data/airports.csv")
+census_data <- read.csv("data/census.csv")
+airline_stats <- read.csv("data/airlines.csv")
 ```
 # EDA
 ```{r general EDA}
-diagnose(airline_data)
-
-tail(airline_data, 50)
-
+#diagnose(airline_data)
+#tail(airline_data, 50)
 #skim(airline_data)
 #remove rando airports
+
 airline_data<- airline_data %>% filter(!str_detect(ORIGIN_AIRPORT, '^1')) #impact of removing all airlines in october
 
 ```
@@ -94,8 +94,13 @@ airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_D
                                             WEATHER_DELAY = ifelse(is.na(WEATHER_DELAY)==TRUE, 0, 1))
 
 
-#subsetting aiport and census data 
 
+airline_stats <- airline_stats %>% rename(AIRLINE_FULLNAME = AIRLINE)
+
+#head(airline_stats)
+#head(airline_data)
+
+#subsetting aiport and census data 
 airport_data_new <- airport_data %>% 
   select(IATA_CODE, STATE)
 
@@ -115,6 +120,15 @@ airline_data_new <- airline_data_new %>% rename(ORIGIN_AIRPORT_DIVISION = Divisi
 airline_data_new <- left_join(airline_data_new, census_data_new, by = c("DESTINATION_AIRPORT_STATE"="State.Code"))
 airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_REGION = Region)
 airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_DIVISION = Division)
+
+#mergining airline descriptive data with flight data 
+airline_data_new <- left_join(airline_data_new, airline_stats, by = c("AIRLINE"="IATA_CODE"))
+
+airline_data_new <- airline_data_new %>% mutate(ORIGIN_BASE = ifelse(ORIGIN_AIRPORT==Hub_1, 1, ifelse(ORIGIN_AIRPORT==Hub_2, 1, ifelse(ORIGIN_AIRPORT==Hub_3, 1, ifelse(ORIGIN_AIRPORT==Hub_4, 1, ifelse(ORIGIN_AIRPORT==Hub_5, 1, 0))))),
+                                                DESTINATION_BASE = ifelse(DESTINATION_AIRPORT==Hub_1, 1, ifelse(DESTINATION_AIRPORT==Hub_2, 1, ifelse(DESTINATION_AIRPORT==Hub_3, 1, ifelse(DESTINATION_AIRPORT==Hub_4, 1, ifelse(DESTINATION_AIRPORT==Hub_5, 1, 0))))), 
+                                                B2B = ifelse(ORIGIN_BASE == DESTINATION_BASE, 1, 0)) 
+
+airline_data_new
 
 ```
 
@@ -222,14 +236,14 @@ n1<-(2/3)*nsplit #get 2/3
 train.index<-sample(nsplit,n1,replace=FALSE) #sample 2/3
 data.train<-airline_data_new[train.index]# extract the index
 data.val<-airline_data_new[-train.index]
-data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE")
+#data.val <- data.val %>% filter(data.val$ORIGIN_AIRPORT_STATE != "DE")
 #use data.train
 ```
 
 ## Linear Regression for Delay
 ```{r create dataset with select variables for running regression}
 
-airline_subset_regression <- data.train %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, -ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE)
+airline_subset_regression <- data.train %>% select(MONTH, DAY_OF_WEEK, AIRLINE, DISTANCE, DEPARTURE_DELAY, -ARRIVAL_DELAY, ORIGIN_AIRPORT_STATE, DESTINATION_AIRPORT_STATE, DEPARTURE_TIME_OF_DAY, -ARRIVAL_TIME_OF_DAY)
 
 departure_delay_model <- lm(DEPARTURE_DELAY ~ ., airline_subset_regression)
 summary(departure_delay_model)
