@@ -78,19 +78,27 @@ tail(airline_data, 50)
 skim(airline_data)
 #remove rando airports
 airline_data<- airline_data %>% filter(!str_detect(ORIGIN_AIRPORT, '^1')) #impact of removing all airlines in october
+
 ```
 ## Creating New Variables
 ```{r create NEW variables, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
+#creating new variables for flight data
 airline_data_new <- airline_data %>% mutate(FLIGHT_DELAY_15 = ifelse(DEPARTURE_DELAY>15, 1, ifelse(ARRIVAL_DELAY>15, 1, 0)),
                                             FLIGHT_DELAY_5 = ifelse(DEPARTURE_DELAY>5, 1, ifelse(ARRIVAL_DELAY>5, 1, 0)), 
                                             DEPARTURE_TIME_OF_DAY = ifelse(SCHEDULED_DEPARTURE>1200, "PM", "AM"), 
-                                            ARRIVAL_TIME_OF_DAY = ifelse(ARRIVAL_TIME>1200, "PM", "AM"))
+                                            ARRIVAL_TIME_OF_DAY = ifelse(ARRIVAL_TIME>1200, "PM", "AM"),
+                                            AIR_SYSTEM_DELAY = ifelse(is.na(AIR_SYSTEM_DELAY)==TRUE, 0, 1),
+                                            SECURITY_DELAY = ifelse(is.na(SECURITY_DELAY)==TRUE, 0, 1),
+                                            AIRLINE_DELAY = ifelse(is.na(AIRLINE_DELAY)==TRUE, 0, 1),
+                                            LATE_AIRCRAFT_DELAY = ifelse(is.na(LATE_AIRCRAFT_DELAY)==TRUE, 0, 1),
+                                            WEATHER_DELAY = ifelse(is.na(WEATHER_DELAY)==TRUE, 0, 1))
 
-#airport_data_new <- airport_data %>% 
-  #select(IATA_CODE, STATE)
+#subsetting aiport and census data 
+airport_data_new <- airport_data %>% 
+  select(IATA_CODE, STATE)
 
-#census_data_new <- census_data %>%
- # select(State.Code, Region, Division)
+census_data_new <- census_data %>%
+ select(State.Code, Region, Division)
 
 #merging our state data with flight data
 airline_data_new <- left_join(airline_data_new, airport_data_new, by = c("ORIGIN_AIRPORT"="IATA_CODE"))
@@ -106,11 +114,8 @@ airline_data_new <- left_join(airline_data_new, census_data_new, by = c("DESTINA
 airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_REGION = Region)
 airline_data_new <- airline_data_new %>% rename(DESTINATION_AIRPORT_DIVISION = Division)
 
-#merging holiday data 
-
-
-
 ```
+
 ## Selecting a subset of data
 ```{r}
 
