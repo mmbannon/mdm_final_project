@@ -130,7 +130,7 @@ airline_data_new <- airline_data_new %>% mutate(ORIGIN_BASE = ifelse(ORIGIN_AIRP
                                                 DESTINATION_BASE = ifelse(DESTINATION_AIRPORT==Hub_1, 1, ifelse(DESTINATION_AIRPORT==Hub_2, 1, ifelse(DESTINATION_AIRPORT==Hub_3, 1, ifelse(DESTINATION_AIRPORT==Hub_4, 1, ifelse(DESTINATION_AIRPORT==Hub_5, 1, 0))))), 
                                                 B2B = ifelse(ORIGIN_BASE == DESTINATION_BASE, 1, 0)) 
 # Recoding the data 
-
+airline_data_new<-airline_data_new %>% filter(ORIGIN_AIRPORT %in% c("ATL", "DFW", "DEN", "ORD", "LAX", "CLT", "LAS", "PHX", "MCO", "SEA", "MIA","IAH", "FLL", "SFO", "JFK", "MSP", "EWR", "DTW", "BOS", "SLC", "PHL", "BWI", "TPA", "SAN", "MDW", "IAD", "BNA", "LGA", "DAL", "DCA"))
 airline_data_new<-airline_data_new %>% mutate(
                                           Date=paste(YEAR,"-",MONTH,"-",DAY),
                                           DATE=ymd(Date),
@@ -173,13 +173,14 @@ airline_data_new<-airline_data_new %>% mutate(
                                           B2B=factor(B2B),
                                           DIVERTED=factor(DIVERTED))%>% 
                                         select(-YEAR, - Date, -FLIGHT_NUMBER, -TAIL_NUMBER, -QUARTER, - QUATRER.F, -DAY)
+
  #PY = passenger yield, a measure of fare per mile per passenger  presented in cents per mile. 
 #ASM= available seat miles, a measure of the number of seats on the plane, times the distance, regardless of the occupation
 #SL= Stage Length: a measure of the distance flown in miles, per departure of aircraft. 
 #ESM: equivalent seat mile: a mesure of cross-carrier comparisons. 
-head(airline_data_new, 50)
-airline_data_new<-airline_data_new %>% mutate(B2B=factor(B2B))
 
+airline_data_new<-airline_data_new %>% mutate(B2B=factor(B2B))
+head(airline_data_new)
 ```
 
 ## Selecting a subset of data
@@ -305,7 +306,7 @@ prop.table(table(data.train.sub$FLIGHT_DELAY_15))
 ```
 ## delay Tree
 ```{r Logistic Tree For Delay, message=FALSE, warning=FALSE}
-data.train.sub.tree<-data.train.sub %>% select(-ORIGIN_AIRPORT_STATE, -DESTINATION_AIRPORT_STATE, -DESTINATION_AIRPORT, - ORIGIN_AIRPORT) # removing vars with > 32 factors per function
+data.train.sub.tree<-data.train.sub %>% select(-ORIGIN_AIRPORT_STATE, -DESTINATION_AIRPORT_STATE, -DESTINATION_AIRPORT) # removing vars with > 32 factors per function
 tree.delay1<- tree(FLIGHT_DELAY_15~., data=data.train.sub.tree, control=tree.control(nrow(data.train.sub), mindev = 0.005), split="deviance")
 cv.dtree1<-cv.tree(tree.delay1, K=10, FUN=prune.tree) # check for cross-validation error 
 plot(cv.dtree1) # take 3
@@ -318,33 +319,33 @@ text(cv.dtree1.pruned)
 rtree.d1<-rpart(FLIGHT_DELAY_15~., data=data.train.sub.tree, minsplit=1, method="class", cp=.0005, xval=10)
 plotcp(rtree.d1)
 printcp(rtree.d1)
-rtree.d1.prune<-prune.rpart(rtree.d1, cp= 0.00154083       )
-plot(as.party(rtree.d1.prune), gp=gpar(fontsize=7))
+rtree.d1.prune<-prune.rpart(rtree.d1, cp= 0.00342350)
+plot(as.party(rtree.d1.prune), gp=gpar(fontsize=9))
 ```
 
 ```{r random forest for delay, message=FALSE, warning=FALSE}
 set.seed(150)
 
 rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data.train.sub.tree)], mtry=5, num.trees=1000)
-plot(rf) # 250 trees
+plot(rf) # 200 trees
+length(names(data.train.sub.tree))
 
-
-rf.error.p <- 1:31 # set up a vector of length 31
-for (p in 1:31) # repeat the following code inside { } 31 times
+rf.error.p <- 1:26 # set up a vector of length 31
+for (p in 1:26) # repeat the following code inside { } 31 times
 {
-fit.rf <- ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=p, num.trees=250, splitrule="gini", importance="impurity", probability=T)
+fit.rf <- ranger(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data.train.sub.tree)], mtry=p, num.trees=200, splitrule="gini", importance="impurity", probability=T)
 
 rf.error.p[p] <- fit.rf$prediction.error # collecting oob mse based on 250 trees
 }
 rf.error.p # oob mse returned: should be a vector of 19
-plot(1:31, rf.error.p, pch=16,
+plot(1:26, rf.error.p, pch=16,
 xlab="mtry",
 ylab="OOB mse of mtry",
 main = "Testing errors as func of mtry with delay as response")
-lines(1:31, rf.error.p) # 5 mtries 
+lines(1:26, rf.error.p) # 6 mtries 
 
-delay.ranger<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=5, num.trees=250, splitrule="gini", importance="impurity", probability=F, classification = T)
-delay.ranger.p<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub)], mtry=5, num.trees=250, splitrule="gini", importance="impurity", probability=T, classification = F)
+delay.ranger<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub.tree)], mtry=5, num.trees=200, splitrule="gini", importance="impurity", probability=F, classification = T)
+delay.ranger.p<-ranger(FLIGHT_DELAY_15~., data=data.train.sub[complete.cases(data.train.sub.tree)], mtry=5, num.trees=200, splitrule="gini", importance="impurity", probability=T, classification = F)
 summary(delay.ranger)
   ranger.delay.imp<-delay.ranger$variable.importance
   delay.imp<-data.frame(ranger.delay.imp)
@@ -352,7 +353,7 @@ summary(delay.ranger)
   delay.imp<- delay.imp %>% rename(Gini_Reduction = "ranger.delay.imp")
 
 
-delay.rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data.train.sub.tree)], mtry=5, num.trees=250)
+delay.rf<-randomForest(FLIGHT_DELAY_15~., data=data.train.sub.tree[complete.cases(data.train.sub.tree)], mtry=5, num.trees=200)
   delay.imp.1<-randomForest::importance(delay.rf,type=2)
   delay.imp.1<-delay.imp.1[order(delay.imp.1,decreasing=T),]
   delay.imp.1<-data.frame(delay.imp.1)
@@ -366,23 +367,34 @@ write_csv(delay.imp, "data/delay_importance_factors.csv")
 
 ```{r preidcting delay with lasso, message=FALSE, warning=FALSE}
 data.train.sub<-data.train.sub %>% mutate(B2B=factor(B2B))
-data.train.sub.lasso<-data.train.sub %>% drop_na()
+data.train.sub.lasso<-data.train.sub.tree %>% drop_na()
 
 X<-model.matrix(FLIGHT_DELAY_15~., data=data.train.sub.lasso)[,-1]
 Y<-as.matrix(data.train.sub.lasso$FLIGHT_DELAY_15)
 fit.lasso<-cv.glmnet(X,Y, alpha=1, family="binomial", type.measure="deviance", nfolds=10)
 plot(fit.lasso) # use 1.se 
-coef.1se<-coef(fit.lasso, s="lambda.1se") # month, airline, 
+coef.1se<-coef(fit.lasso, s="lambda.1se") # month, airline, origin airport, season, ORIGIN_AIRPORT_DIVISION, destination airport division 
 coef.1se<-coef.1se[which(coef.1se !=0),]
 coef.1se
+var.min<-rownames(as.matrix(coef.1se))[-1]
+var.min
+#get out categorical variables
+var.min<-data.frame(var.min)
+var.min<-var.min %>% filter(!str_detect(var.min, "MONTH"))
+var.min<-var.min %>% filter(!str_detect(var.min, "AIRLINE"))
+var.min<-var.min %>% filter(!str_detect(var.min, "AIRPORT"))
+var.min<-var.min %>% filter(!str_detect(var.min, "SEASON"))
+var.min<-var.min %>% filter(!str_detect(var.min, "TIME"))
+var.min<-c(var.min$var.min)
+final.data.set.lasso<-data.train.sub.lasso[, c("FLIGHT_DELAY_15", "MONTH", "AIRLINE", "ORIGIN_AIRPORT",  "DEPARTURE_TIME_OF_DAY", "ORIGIN_AIRPORT_DIVISION", "DESTINATION_AIRPORT_DIVISION", "SEASON", ..var.min)] # kick out origin airport region per ANOVA later # also kick out season
+final.data.set.lasso<-final.data.set.lasso %>% select(-ORIGIN_AIRPORT_DIVISION, -SEASON)
 
-
+lasso.relax<-glm(FLIGHT_DELAY_15~., data=final.data.set.lasso, family="binomial")
+summary(lasso.relax)
+Anova(lasso.relax)
+lasso.1<-glm(FLIGHT_DELAY_15~1, data=final.data.set.lasso, family="binomial")
+anova(lasso.1, lasso.relax, test="Chisq")
 ```
-
-
-
-
-
 
 
 ```{r comparing predictions ranger and random forest, message=FALSE, warning=FALSE}
@@ -393,43 +405,70 @@ fit.rf.delay.predict.y<-predict(delay.rf, newdata=data.val)
   rf.test.err<-mean(data.val$FLIGHT_DELAY_15 != fit.rf.delay.predict.y)
       rf.roc<-roc(data.val$FLIGHT_DELAY_15, fit.rf.delay.predic[,2], plot=T)
       rf.test.err
-      rf.roc
+     plot(rf.roc, main="rf.roc")
     delay.rf.auc<-auc(rf.roc)
 
 #validation error for Ranger
     #validaiton error 
 fit.ranger.delay.predict.y<-predict(delay.ranger, data =data.val, predict.all = F)
-  fit.ranger.delay.predic<-predict(delay.ranger.p, data=data.val, type="response", probability=T)
-    fit.ranger.delay.predic$predictions<-c(fit.ranger.delay.predic$predictions)
-    fit.ranger.delay.predic$predictions
+  fit.ranger.delay.predic<-predict(delay.ranger.p, data=data.val, type="response")$predictions
+   
     # testing error
   ranger.test.err<-mean(data.val$FLIGHT_DELAY_15 != fit.ranger.delay.predict.y$predictions)
       ranger.test.err
-      ranger.roc<-roc(data.val$FLIGHT_DELAY_15, fit.ranger.delay.predic$predictions[,2], plot=T)
-      plot(ranger.roc)
-      ranger.auc<-auc<-ranger.roc
-    delay.ranger.auc<-auc(ranger.roc)
+      ranger.roc<-roc(data.val$FLIGHT_DELAY_15, fit.ranger.delay.predic[,2], plot=T)
+      plot(ranger.roc, main="ranger.roc")
+      delay.ranger.auc<-auc(ranger.roc)
 
 
-
-
-Delay.Errors<-data.frame(delay.rf$err.rate[250])
-  colnames(Delay.Errors)<-"training OOB error"
+#validation error for LASSO
+    #validation error 
+     fit.lasso.pred.prob<-predict(lasso.relax, data.val, type="response") 
+     fit.lasso.train.err<-mean(data.val$FLIGHT_DELAY_15!=ifelse(lasso.relax$fitted.values>.5,1,0))
+     fit.lasso.test.err<-mean(data.val$FLIGHT_DELAY_15!=ifelse(fit.lasso.pred.prob>.5,1,0))#using baysian unequal loss :.33; worse than using mv for now. 
+    #auc
+    lasso.roc<-roc(data.val$FLIGHT_DELAY_15, fit.lasso.pred.prob, plot=T)
+    lasso.auc<-auc(lasso.roc)
+    plot(lasso.roc, main="lasso.roc")
+# final data frame 
+Delay.Errors<-data.frame(delay.rf$err.rate[200])
+  colnames(Delay.Errors)<-"training_error"
   Delay.Errors$model<-"Random Forest Classification with MV"
   Delay.Errors$AUC<-round(delay.rf.auc,3)
   Delay.Errors$testing<-round(rf.test.err,3)
 
 Delay.Errors.ranger<-data.frame(delay.ranger.p$prediction.error)
-    colnames(Delay.Errors.ranger)<-"training OOB error"
+    colnames(Delay.Errors.ranger)<-"training_error"
   Delay.Errors.ranger$model<-"Random Forest Classification with Gini"
   Delay.Errors.ranger$AUC<-round(delay.ranger.auc,3)
   Delay.Errors.ranger$testing<-round(ranger.test.err,3)
 
-
+Delay.Errors.lasso<-data.frame(fit.lasso.train.err)
+  colnames(Delay.Errors.lasso)<- "training_error" 
+  Delay.Errors.lasso$model<-"Cross-Validated Lasso" 
+  Delay.Errors.lasso$AUC<-round(lasso.auc,3)
+  Delay.Errors.lasso$testing<-round(fit.lasso.test.err,3)
   
-rbind(Delay.Errors, Delay.Errors.ranger)
-names(Delay.Errors)
-names(Delay.Errors.ranger)
+model.eval<-rbind(Delay.Errors, Delay.Errors.ranger, Delay.Errors.lasso) %>% relocate(model) %>% arrange(-AUC)
+model.eval<-model.eval %>% mutate(training_error=round(training_error,3))
+model.eval
+knitr::kable(model.eval)
+
+```
+
+
+```{r auc plot, warning=FALSE, message=FALSE}
+plot(1-rf.roc$specificities, rf.roc$sensitivities, 
+        col="orange", type="l", lwd=3, 
+        xlab=paste("AUC(rf)=",round(delay.rf.auc,3), 
+                   "     AUC(ranger.gini)=", round(delay.ranger.auc,3), 
+                   "     AUC(CV Lasso)=", round(lasso.auc, 3)),
+        ylab="Sensitivities(True Positives)")
+lines(1-ranger.roc$specificities, ranger.roc$sensitivities, col="red", lwd=3)
+lines(1-lasso.roc$specificities, lasso.roc$sensitivities, col="blue", lwd=3)
+legend("bottomright", legend=c("RF AUC", "Ranger GINI AUC", "Lasso AUC"),
+       lty=c(1,1), lwd=c(2,2), col=c("orange", "red", "blue"))
+title("Comparison of models AUC using testing data")
 
 ```
 
