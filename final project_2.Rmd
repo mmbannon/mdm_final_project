@@ -469,12 +469,4 @@ lines(1-lasso.roc$specificities, lasso.roc$sensitivities, col="blue", lwd=3)
 legend("bottomright", legend=c("RF AUC", "Ranger GINI AUC", "Lasso AUC"),
        lty=c(1,1), lwd=c(2,2), col=c("orange", "red", "blue"))
 title("Comparison of models AUC using testing data")
-
 ```
-
-
-
-
-
-
-
